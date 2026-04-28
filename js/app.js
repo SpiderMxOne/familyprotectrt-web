@@ -23,13 +23,59 @@ let listeners = {
     familyGroup: null
 };
 
+// Google Maps objects
+let map;
+let markers = {};
+let safePlaceCircles = [];
+
 // --- Initialization ---
 
 document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     initOnboarding();
     checkExistingSession();
+    loadGoogleMapsScript(); // Carga dinámica de la API de Maps
 });
+
+function loadGoogleMapsScript() {
+    if (typeof window.FP_CONFIG === 'undefined' || !window.FP_CONFIG.googleMaps?.apiKey) {
+        console.warn("Maps API Key no configurada.");
+        return;
+    }
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${window.FP_CONFIG.googleMaps.apiKey}&callback=initMap`;
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+}
+
+// Función global requerida por Google Maps
+window.initMap = function() {
+    console.log("Google Maps API cargada.");
+    const mapContainer = document.getElementById('map');
+    if (!mapContainer) return;
+
+    // Limpiar mensaje de placeholder
+    mapContainer.innerHTML = '';
+
+    map = new google.maps.Map(mapContainer, {
+        center: { lat: 19.4326, lng: -99.1332 },
+        zoom: 12,
+        styles: [
+            { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+            { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+            { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+            {
+              featureType: "administrative.locality",
+              elementType: "labels.text.fill",
+              stylers: [{ color: "#d59563" }],
+            }
+        ]
+    });
+
+    // Si ya hay datos cargados, renderizar
+    if (currentState.members.length > 0) renderMembersOnMap();
+};
 
 function initTabs() {
     const tabs = ['join', 'admin'];
@@ -254,6 +300,21 @@ function renderMembers() {
     currentState.members.forEach(member => {
         if (member.id === currentState.uid) return;
 
+        // ... (resto de la lógica de renderizado de listas se mantiene igual)
+        renderMemberItems(member, chatList, familyGrid, mapList);
+
+        if (member.isSOS) {
+            sosCount++;
+            activeSOS.push(member);
+        }
+    });
+
+    renderSOSAlerts(activeSOS);
+    renderMembersOnMap(); // NUEVA LLAMADA
+}
+
+// Función auxiliar para no duplicar código en el re-render
+function renderMemberItems(member, chatList, familyGrid, mapList) {
         // Chat List Item
         const chatItem = `
             <button onclick="selectRecipient('${member.id}')" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-all ${currentState.selectedRecipientId === member.id ? 'bg-blue-50 border border-blue-100' : ''}">
@@ -299,7 +360,7 @@ function renderMembers() {
 
         // Map Status Item
         const mapItem = `
-            <div class="flex items-center gap-4">
+            <div class="flex items-center gap-4 cursor-pointer hover:bg-gray-50 p-1 rounded-lg" onclick="focusOnMember('${member.id}')">
                 <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-black">${member.name.charAt(0)}</div>
                 <div class="flex-1">
                     <p class="text-sm font-bold text-gray-800">${member.name}</p>
@@ -308,14 +369,42 @@ function renderMembers() {
             </div>
         `;
         mapList.innerHTML += mapItem;
+}
 
-        if (member.isSOS) {
-            sosCount++;
-            activeSOS.push(member);
+function renderMembersOnMap() {
+    if (!map) return;
+
+    currentState.members.forEach(member => {
+        if (member.latitude && member.longitude) {
+            const position = { lat: member.latitude, lng: member.longitude };
+
+            if (markers[member.id]) {
+                markers[member.id].setPosition(position);
+            } else {
+                markers[member.id] = new google.maps.Marker({
+                    position: position,
+                    map: map,
+                    title: member.name,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 10,
+                        fillColor: member.isSOS ? "#FF0000" : "#2563eb",
+                        fillOpacity: 1,
+                        strokeWeight: 2,
+                        strokeColor: "#FFFFFF"
+                    }
+                });
+            }
         }
     });
+}
 
-    renderSOSAlerts(activeSOS);
+function focusOnMember(id) {
+    const member = currentState.members.find(m => m.id === id);
+    if (member && member.latitude && member.longitude && map) {
+        map.setCenter({ lat: member.latitude, lng: member.longitude });
+        map.setZoom(16);
+    }
 }
 
 function renderMessages() {
