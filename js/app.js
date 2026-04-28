@@ -34,7 +34,9 @@ document.addEventListener('DOMContentLoaded', () => {
 function initTabs() {
     const tabs = ['join', 'admin'];
     tabs.forEach(tab => {
-        document.getElementById(`tab-${tab}`).addEventListener('click', () => {
+        const btn = document.getElementById(`tab-${tab}`);
+        if (!btn) return;
+        btn.addEventListener('click', () => {
             tabs.forEach(t => {
                 document.getElementById(`tab-${t}`).classList.remove('bg-white', 'shadow-sm', 'text-blue-600');
                 document.getElementById(`tab-${t}`).classList.add('text-gray-500');
@@ -45,6 +47,12 @@ function initTabs() {
             document.getElementById(`form-${tab}`).classList.remove('hidden');
         });
     });
+}
+
+function initOnboarding() {
+    // Asegurar que el formulario de unirse sea el visible por defecto
+    document.getElementById('form-join').classList.remove('hidden');
+    document.getElementById('form-admin').classList.add('hidden');
 }
 
 async function checkExistingSession() {
@@ -75,8 +83,9 @@ async function handleJoin() {
     if (!name || !code) return showAuthError("Completa todos los campos");
 
     showLoading(true);
-    const uid = await FirebaseManager.loginAnonymously();
-    if (uid) {
+    const result = await FirebaseManager.loginAnonymously();
+    if (result.uid) {
+        const uid = result.uid;
         const member = {
             name: name,
             role: 'USER',
@@ -97,7 +106,7 @@ async function handleJoin() {
             showAuthError("Código de familia no válido");
         }
     } else {
-        showAuthError("Error de conexión");
+        showAuthError(`Error: ${result.error || "No se pudo iniciar sesión"}`);
     }
     showLoading(false);
 }
@@ -109,8 +118,9 @@ async function handleAdminLogin() {
     if (!email || !pass) return showAuthError("Completa todos los campos");
 
     showLoading(true);
-    const uid = await FirebaseManager.authenticateAdmin(email, pass);
-    if (uid) {
+    const result = await FirebaseManager.authenticateAdmin(email, pass);
+    if (result.uid) {
+        const uid = result.uid;
         const code = await FirebaseManager.getFamilyCodeByAdmin(email);
         if (code) {
             saveSession(code, uid);
@@ -122,7 +132,7 @@ async function handleAdminLogin() {
             showAuthError("No se encontró familia asociada");
         }
     } else {
-        showAuthError("Credenciales incorrectas");
+        showAuthError(`Error: ${result.error || "Credenciales incorrectas"}`);
     }
     showLoading(false);
 }
@@ -134,8 +144,9 @@ async function handleAdminCreate() {
     if (!email || !pass) return showAuthError("Completa todos los campos");
 
     showLoading(true);
-    const uid = await FirebaseManager.createAdminAccount(email, pass);
-    if (uid) {
+    const result = await FirebaseManager.createAdminAccount(email, pass);
+    if (result.uid) {
+        const uid = result.uid;
         const code = Math.random().toString(36).substring(2, 8).toUpperCase();
         const member = {
             name: email.split('@')[0],
@@ -157,7 +168,7 @@ async function handleAdminCreate() {
             showAuthError("Error al crear la familia");
         }
     } else {
-        showAuthError("Error al crear cuenta. Email en uso o pass débil.");
+        showAuthError(`Error: ${result.error || "No se pudo crear cuenta"}`);
     }
     showLoading(false);
 }

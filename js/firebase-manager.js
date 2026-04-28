@@ -7,30 +7,30 @@ const FirebaseManager = {
     loginAnonymously: async () => {
         try {
             const result = await auth.signInAnonymously();
-            return result.user.uid;
+            return { uid: result.user.uid };
         } catch (e) {
             console.error("Auth Anónima Fallida:", e);
-            return null;
+            return { error: e.message };
         }
     },
 
     createAdminAccount: async (email, pass) => {
         try {
             const result = await auth.createUserWithEmailAndPassword(email, pass);
-            return result.user.uid;
+            return { uid: result.user.uid };
         } catch (e) {
             console.error("Error al crear cuenta:", e);
-            return null;
+            return { error: e.message };
         }
     },
 
     authenticateAdmin: async (email, pass) => {
         try {
             const result = await auth.signInWithEmailAndPassword(email, pass);
-            return result.user.uid;
+            return { uid: result.user.uid };
         } catch (e) {
             console.error("Error al autenticar:", e);
-            return null;
+            return { error: e.message };
         }
     },
 
