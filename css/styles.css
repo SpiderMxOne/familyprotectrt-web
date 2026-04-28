@@ -1,0 +1,88 @@
+/* Custom Styles for FamilyProtect Web */
+
+:root {
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --red-sos: #dc2626;
+}
+
+body {
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #cbd5e1;
+}
+
+/* Animations */
+@keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-slide-up {
+    animation: slideUp 0.4s ease-out forwards;
+}
+
+/* Navigation Buttons */
+.nav-btn.active {
+    background-color: #eff6ff;
+    color: #2563eb;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+}
+
+.nav-btn.active i {
+    color: #2563eb;
+}
+
+/* Glassmorphism */
+.glass {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Chat Bubbles */
+.message-me {
+    background: var(--primary);
+    color: white;
+    border-radius: 20px 20px 4px 20px;
+}
+
+.message-other {
+    background: white;
+    color: #1e293b;
+    border-radius: 20px 20px 20px 4px;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+}
+
+/* SOS Alert Card */
+.sos-card {
+    background: linear-gradient(135deg, #450a0a 0%, #000000 100%);
+    border: 2px solid #991b1b;
+}
+
+/* Transitions */
+.tab-content {
+    transition: opacity 0.3s ease;
+}
+
+.hidden {
+    display: none !important;
+}

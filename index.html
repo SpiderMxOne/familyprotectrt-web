@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FamilyProtect - Monitor Web</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Firebase SDK (v8) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <!-- CryptoJS for E2EE -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-gray-100 font-sans antialiased h-screen overflow-hidden">
+
+    <!-- App Container -->
+    <div id="app" class="h-full flex flex-col">
+
+        <!-- Login / Onboarding Overlay -->
+        <div id="onboarding" class="fixed inset-0 bg-white z-50 flex items-center justify-center p-4">
+            <div class="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 border border-gray-100">
+                <div class="text-center mb-8">
+                    <div class="inline-flex items-center justify-center w-20 h-20 bg-blue-600 text-white rounded-3xl mb-4 shadow-lg">
+                        <i class="fas fa-shield-halved text-4xl"></i>
+                    </div>
+                    <h1 class="text-3xl font-black text-gray-900">FamilyProtect</h1>
+                    <p class="text-gray-500 mt-2">Seguridad familiar en tiempo real</p>
+                </div>
+
+                <!-- Tabs -->
+                <div class="flex mb-6 bg-gray-100 p-1 rounded-xl">
+                    <button id="tab-join" class="flex-1 py-2 rounded-lg font-bold text-sm bg-white shadow-sm text-blue-600 transition-all">UNIRSE</button>
+                    <button id="tab-admin" class="flex-1 py-2 rounded-lg font-bold text-sm text-gray-500 hover:bg-gray-200 transition-all">ADMINISTRAR</button>
+                </div>
+
+                <!-- Join Form -->
+                <div id="form-join" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Nombre</label>
+                        <input type="text" id="join-name" placeholder="Tu nombre" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Código de Familia</label>
+                        <input type="text" id="join-code" placeholder="6 Caracteres" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none uppercase font-mono tracking-widest transition-all">
+                    </div>
+                    <button onclick="handleJoin()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-200 transition-all">
+                        ACCEDER AL GRUPO
+                    </button>
+                </div>
+
+                <!-- Admin Form (Hidden by default) -->
+                <div id="form-admin" class="space-y-4 hidden">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Correo Electrónico</label>
+                        <input type="email" id="admin-email" placeholder="admin@correo.com" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Contraseña</label>
+                        <input type="password" id="admin-pass" placeholder="••••••••" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="handleAdminLogin()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-200 transition-all">
+                            INICIAR
+                        </button>
+                        <button onclick="handleAdminCreate()" class="flex-1 bg-white border-2 border-blue-600 text-blue-600 font-bold py-4 rounded-xl hover:bg-blue-50 transition-all">
+                            CREAR FAMILIA
+                        </button>
+                    </div>
+                </div>
+
+                <div id="auth-status" class="mt-4 text-center text-sm font-medium text-red-500 hidden"></div>
+            </div>
+        </div>
+
+        <!-- Main Dashboard (Hidden by default) -->
+        <div id="dashboard" class="h-full flex flex-col md:flex-row hidden">
+
+            <!-- Navigation Sidebar (Web/Tablet) -->
+            <aside class="w-20 md:w-64 bg-white border-r border-gray-100 flex flex-col items-center md:items-stretch transition-all">
+                <div class="p-6 hidden md:block">
+                    <h2 class="text-xl font-black text-blue-600 flex items-center gap-2">
+                        <i class="fas fa-shield-halved"></i>
+                        <span>FamilyProtect</span>
+                    </h2>
+                </div>
+                <div class="mt-8 flex-1 flex flex-col gap-2 px-2 md:px-4">
+                    <button onclick="switchTab('chat')" data-tab="chat" class="nav-btn active flex items-center gap-4 px-4 py-3 rounded-xl text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-all">
+                        <i class="fas fa-comment-dots text-xl w-6"></i>
+                        <span class="font-bold text-sm hidden md:block">Mensajería</span>
+                    </button>
+                    <button onclick="switchTab('map')" data-tab="map" class="nav-btn flex items-center gap-4 px-4 py-3 rounded-xl text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-all">
+                        <i class="fas fa-map-location-dot text-xl w-6"></i>
+                        <span class="font-bold text-sm hidden md:block">Mapa Familiar</span>
+                    </button>
+                    <button onclick="switchTab('family')" data-tab="family" class="nav-btn flex items-center gap-4 px-4 py-3 rounded-xl text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-all">
+                        <i class="fas fa-users text-xl w-6"></i>
+                        <span class="font-bold text-sm hidden md:block">Mi Familia</span>
+                    </button>
+                    <button onclick="switchTab('sos')" data-tab="sos" class="nav-btn flex items-center gap-4 px-4 py-3 rounded-xl text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all">
+                        <i class="fas fa-tower-broadcast text-xl w-6"></i>
+                        <span class="font-bold text-sm hidden md:block text-red-600">CENTRO SOS</span>
+                    </button>
+                </div>
+                <div class="p-4 border-t border-gray-100">
+                    <div id="user-badge" class="flex items-center gap-3 bg-gray-50 p-3 rounded-2xl">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-lg">U</div>
+                        <div class="hidden md:block overflow-hidden">
+                            <p id="user-name" class="font-bold text-sm truncate text-gray-800">Cargando...</p>
+                            <p id="user-role" class="text-[10px] uppercase font-black tracking-tighter text-blue-500">Miembro</p>
+                        </div>
+                    </div>
+                    <button onclick="handleLogout()" class="mt-4 w-full text-left flex items-center gap-4 px-4 py-3 rounded-xl text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all">
+                        <i class="fas fa-right-from-bracket text-xl w-6"></i>
+                        <span class="font-bold text-sm hidden md:block">Cerrar Sesión</span>
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Main Content Area -->
+            <main class="flex-1 flex flex-col min-w-0 bg-gray-50">
+
+                <!-- Tab: Chat -->
+                <section id="tab-content-chat" class="tab-content h-full flex flex-col">
+                    <header class="bg-white border-b border-gray-100 p-6 flex justify-between items-center">
+                        <div>
+                            <h1 class="text-2xl font-black text-gray-900">Mensajería Segura</h1>
+                            <p class="text-xs font-bold text-blue-500 uppercase tracking-widest">Cifrado de extremo a extremo</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="flex h-3 w-3 relative">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                            </span>
+                            <span class="text-sm font-bold text-gray-500">Canal Seguro Activo</span>
+                        </div>
+                    </header>
+                    <div class="flex-1 overflow-hidden flex flex-col md:flex-row">
+                        <!-- Recipients List -->
+                        <div class="w-full md:w-80 bg-white border-r border-gray-100 overflow-y-auto">
+                            <div class="p-4">
+                                <button onclick="selectRecipient(null)" class="w-full flex items-center gap-4 p-4 rounded-2xl bg-blue-50 border-2 border-blue-200 group transition-all">
+                                    <div class="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-xl shadow-lg shadow-blue-100">
+                                        <i class="fas fa-user-group"></i>
+                                    </div>
+                                    <div class="text-left">
+                                        <p class="font-bold text-gray-900">Chat Familiar</p>
+                                        <p class="text-xs text-blue-500 font-bold">Grupo General</p>
+                                    </div>
+                                </button>
+                                <div class="mt-8">
+                                    <h3 class="px-4 text-[10px] font-black uppercase text-gray-400 tracking-widest mb-4">Miembros Disponibles</h3>
+                                    <div id="members-chat-list" class="space-y-1">
+                                        <!-- Members injected here -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Chat Window -->
+                        <div class="flex-1 flex flex-col bg-gray-50 relative">
+                            <div id="chat-messages" class="flex-1 overflow-y-auto p-6 space-y-4">
+                                <!-- Messages injected here -->
+                            </div>
+                            <!-- Input Area -->
+                            <div class="p-6 bg-white border-t border-gray-100">
+                                <div class="flex gap-4 items-center max-w-4xl mx-auto">
+                                    <div class="flex-1 relative">
+                                        <input type="text" id="chat-input" placeholder="Escribe un mensaje protegido..." class="w-full bg-gray-50 border border-gray-200 rounded-2xl px-6 py-4 outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+                                        <button class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-600">
+                                            <i class="fas fa-smile text-xl"></i>
+                                        </button>
+                                    </div>
+                                    <button onclick="handleSendMessage()" class="bg-blue-600 hover:bg-blue-700 text-white w-14 h-14 rounded-2xl shadow-lg shadow-blue-200 flex items-center justify-center transition-all">
+                                        <i class="fas fa-paper-plane text-xl"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Tab: Map -->
+                <section id="tab-content-map" class="tab-content h-full flex flex-col hidden">
+                    <header class="bg-white border-b border-gray-100 p-6 flex justify-between items-center z-10">
+                        <div>
+                            <h1 class="text-2xl font-black text-gray-900">Ubicación en Vivo</h1>
+                            <p class="text-xs font-bold text-green-500 uppercase tracking-widest">Seguimiento por GPS Protegido</p>
+                        </div>
+                    </header>
+                    <div class="flex-1 relative">
+                        <div id="map" class="absolute inset-0 bg-gray-200">
+                            <div class="h-full flex items-center justify-center flex-col p-12 text-center bg-gray-900 text-white">
+                                <i class="fas fa-map-marked-alt text-6xl mb-6 text-blue-500 opacity-20"></i>
+                                <h3 class="text-2xl font-black mb-2">Configuración de Google Maps</h3>
+                                <p class="text-gray-400 max-w-sm">Para activar el mapa real, debes añadir tu API KEY de Google Cloud en el archivo app.js</p>
+                                <button class="mt-8 bg-blue-600 px-8 py-3 rounded-xl font-bold">Vincular Servicio</button>
+                            </div>
+                        </div>
+                        <!-- Map Overlay (Members Card) -->
+                        <div class="absolute top-6 right-6 w-80 space-y-4 pointer-events-none">
+                            <div id="map-member-status" class="pointer-events-auto bg-white/90 backdrop-blur-md p-4 rounded-3xl shadow-2xl border border-white/20">
+                                <h3 class="text-xs font-black uppercase text-gray-400 tracking-widest mb-4">Estado de la Flota</h3>
+                                <div id="map-members-list" class="space-y-4">
+                                    <!-- Dynamic content -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Tab: Family -->
+                <section id="tab-content-family" class="tab-content h-full flex flex-col hidden overflow-y-auto">
+                    <header class="bg-white border-b border-gray-100 p-10">
+                        <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-end gap-6">
+                            <div>
+                                <p class="text-sm font-black text-blue-500 uppercase tracking-[0.2em] mb-2">Panel de Control</p>
+                                <h1 class="text-5xl font-black text-gray-900 leading-none">Mi Círculo Familiar</h1>
+                            </div>
+                            <div class="bg-blue-600 text-white px-8 py-4 rounded-3xl shadow-xl shadow-blue-200 flex items-center gap-4">
+                                <div class="text-right">
+                                    <p class="text-[10px] font-black uppercase opacity-60 tracking-widest">Código Familiar</p>
+                                    <p id="display-family-code" class="text-2xl font-black tracking-widest font-mono">------</p>
+                                </div>
+                                <button onclick="copyFamilyCode()" class="w-12 h-12 bg-white/20 rounded-2xl hover:bg-white/30 flex items-center justify-center transition-all">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+                    <div class="max-w-6xl mx-auto w-full p-10 grid grid-cols-1 lg:grid-cols-3 gap-10">
+                        <!-- Members Grid -->
+                        <div class="lg:col-span-2 space-y-8">
+                            <h3 class="text-xl font-black text-gray-900">Miembros Registrados</h3>
+                            <div id="family-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <!-- Members injected here -->
+                            </div>
+                        </div>
+                        <!-- Side Stats / Audit -->
+                        <div class="space-y-8">
+                            <div class="bg-white p-8 rounded-[40px] shadow-2xl shadow-gray-200/50 border border-gray-50">
+                                <h3 class="text-xl font-black text-gray-900 mb-6">Seguridad</h3>
+                                <div class="space-y-6">
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-12 h-12 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center text-xl">
+                                            <i class="fas fa-shield-check"></i>
+                                        </div>
+                                        <div>
+                                            <p class="font-bold text-gray-800">E2EE Activo</p>
+                                            <p class="text-xs text-gray-400">Mensajes cifrados con AES-256</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-xl">
+                                            <i class="fas fa-location-crosshairs"></i>
+                                        </div>
+                                        <div>
+                                            <p class="font-bold text-gray-800">GPS Dinámico</p>
+                                            <p class="text-xs text-gray-400">Actualización cada 30 segundos</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Audit Logs -->
+                            <div class="bg-gray-900 p-8 rounded-[40px] shadow-2xl shadow-gray-900/20 text-white">
+                                <div class="flex justify-between items-center mb-6">
+                                    <h3 class="text-lg font-black italic tracking-tighter">AUDIT_LOG</h3>
+                                    <span class="text-[10px] font-black bg-blue-600 px-3 py-1 rounded-full uppercase">Live</span>
+                                </div>
+                                <div id="audit-logs" class="space-y-4 font-mono text-[11px] h-64 overflow-y-auto pr-2">
+                                    <!-- Logs injected here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Tab: SOS Monitor -->
+                <section id="tab-content-sos" class="tab-content h-full flex flex-col hidden bg-gray-900 overflow-y-auto">
+                    <div class="flex-1 flex flex-col items-center justify-center p-10 text-center">
+                        <div id="sos-header" class="mb-12">
+                            <div class="w-32 h-32 bg-red-600/10 text-red-600 rounded-full flex items-center justify-center mx-auto mb-8 border-4 border-red-600/20 animate-pulse">
+                                <i class="fas fa-triangle-exclamation text-6xl"></i>
+                            </div>
+                            <h1 class="text-5xl font-black text-white mb-4 tracking-tighter">CENTRO DE RESPUESTA SOS</h1>
+                            <p class="text-gray-400 text-lg max-w-2xl mx-auto">Monitor de emergencias en tiempo real. Aquí aparecerán las alertas críticas de pánico de cualquier miembro de la familia.</p>
+                        </div>
+
+                        <div id="sos-active-list" class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <!-- Active SOS Alerts Injected Here -->
+                            <div class="col-span-full py-20 border-2 border-dashed border-gray-800 rounded-[50px]">
+                                <p class="text-gray-600 font-black uppercase tracking-[0.3em]">No hay emergencias activas</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-16 bg-red-600/5 p-12 rounded-[60px] border border-red-600/10 w-full max-w-4xl">
+                            <h3 class="text-red-500 font-black text-xl mb-4 italic tracking-tighter uppercase">Protocolo de Emergencia</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
+                                <div class="space-y-2">
+                                    <p class="text-white font-black text-2xl">01.</p>
+                                    <p class="text-gray-400 text-sm">Verifica la ubicación precisa del miembro en el mapa familiar inmediatamente.</p>
+                                </div>
+                                <div class="space-y-2">
+                                    <p class="text-white font-black text-2xl">02.</p>
+                                    <p class="text-gray-400 text-sm">Intenta establecer contacto por el canal de chat cifrado o llamada directa.</p>
+                                </div>
+                                <div class="space-y-2">
+                                    <p class="text-white font-black text-2xl">03.</p>
+                                    <p class="text-gray-400 text-sm">Contacta a los servicios de emergencia locales si la situación lo requiere.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <!-- Global Toast Container -->
+        <div id="toast-container" class="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] space-y-2"></div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/config.js"></script>
+    <script src="js/firebase-init.js"></script>
+    <script src="js/security-utils.js"></script>
+    <script src="js/firebase-manager.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
