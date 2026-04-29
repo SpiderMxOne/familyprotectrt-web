@@ -105,6 +105,10 @@
                         <i class="fas fa-tower-broadcast text-xl w-6"></i>
                         <span class="font-bold text-sm hidden md:block text-red-600">CENTRO SOS</span>
                     </button>
+                    <button onclick="switchTab('incidents')" data-tab="incidents" class="nav-btn flex items-center gap-4 px-4 py-3 rounded-xl text-gray-500 hover:bg-orange-50 hover:text-orange-600 transition-all">
+                        <i class="fas fa-file-shield text-xl w-6"></i>
+                        <span class="font-bold text-sm hidden md:block">Evidencias</span>
+                    </button>
                 </div>
                 <div class="p-4 border-t border-gray-100">
                     <div id="user-badge" class="flex items-center gap-3 bg-gray-50 p-3 rounded-2xl">
@@ -311,6 +315,26 @@
                                     <p class="text-white font-black text-2xl">03.</p>
                                     <p class="text-gray-400 text-sm">Contacta a los servicios de emergencia locales si la situación lo requiere.</p>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Tab: Incidents / Safe Meeting Evidence -->
+                <section id="tab-content-incidents" class="tab-content h-full flex flex-col hidden overflow-y-auto">
+                    <header class="bg-white border-b border-gray-100 p-10">
+                        <div class="max-w-6xl mx-auto">
+                            <p class="text-sm font-black text-orange-500 uppercase tracking-[0.2em] mb-2">Protocolo de Última Instancia</p>
+                            <h1 class="text-5xl font-black text-gray-900 leading-none">Caja Negra de Incidentes</h1>
+                            <p class="mt-4 text-gray-500">Evidencia crítica recolectada durante Citas Seguras o emergencias extremas.</p>
+                        </div>
+                    </header>
+                    <div class="max-w-6xl mx-auto w-full p-10">
+                        <div id="incidents-list" class="space-y-6">
+                            <!-- Incidents injected here -->
+                            <div class="py-20 text-center border-2 border-dashed border-gray-200 rounded-[50px]">
+                                <i class="fas fa-folder-open text-4xl text-gray-300 mb-4"></i>
+                                <p class="text-gray-400 font-bold uppercase tracking-widest">No se han registrado incidentes críticos</p>
                             </div>
                         </div>
                     </div>

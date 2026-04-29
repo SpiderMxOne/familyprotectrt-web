@@ -10,6 +10,7 @@ let currentState = {
     members: [],
     messages: [],
     auditLogs: [],
+    incidents: [],
     secretKey: null,
     selectedRecipientId: null,
     activeTab: 'chat'
@@ -20,6 +21,7 @@ let listeners = {
     members: null,
     messages: null,
     auditLogs: null,
+    incidents: null,
     familyGroup: null
 };
 
@@ -250,6 +252,11 @@ function startApp() {
         renderAuditLogs();
     });
 
+    listeners.incidents = FirebaseManager.listenForIncidents(currentState.familyCode, (incidents) => {
+        currentState.incidents = incidents;
+        renderIncidents();
+    });
+
     listeners.familyGroup = FirebaseManager.listenForFamilyGroup(currentState.familyCode, (group) => {
         // Handle family group updates (safe places, etc)
     });
@@ -351,7 +358,9 @@ function renderMemberItems(member, chatList, familyGrid, mapList) {
                     </div>
                     <div class="bg-gray-50 p-3 rounded-2xl text-center">
                         <p class="text-[9px] font-black text-gray-400 uppercase tracking-tighter">Estado</p>
-                        <p class="font-black ${member.isSOS ? 'text-red-500' : 'text-green-500'}">${member.isSOS ? 'SOS' : 'OK'}</p>
+                        <p class="font-black ${member.isSOS ? 'text-red-500' : (member.isSafeMeetingActive ? 'text-orange-500' : 'text-green-500')}">
+                            ${member.isSOS ? 'SOS' : (member.isSafeMeetingActive ? 'CITA' : 'OK')}
+                        </p>
                     </div>
                 </div>
             </div>
@@ -437,6 +446,7 @@ function renderMessages() {
 
 function renderAuditLogs() {
     const container = document.getElementById('audit-logs');
+    if (!container) return;
     container.innerHTML = '';
     currentState.auditLogs.forEach(log => {
         const line = `
@@ -448,6 +458,68 @@ function renderAuditLogs() {
         `;
         container.innerHTML += line;
     });
+}
+
+function renderIncidents() {
+    const container = document.getElementById('incidents-list');
+    if (!container) return;
+
+    if (currentState.incidents.length === 0) {
+        container.innerHTML = `
+            <div class="py-20 text-center border-2 border-dashed border-gray-200 rounded-[50px]">
+                <i class="fas fa-folder-open text-4xl text-gray-300 mb-4"></i>
+                <p class="text-gray-400 font-bold uppercase tracking-widest">No se han registrado incidentes críticos</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = '';
+    currentState.incidents.forEach(incident => {
+        const member = currentState.members.find(m => m.id === incident.memberId);
+        const card = `
+            <div class="bg-white p-8 rounded-[40px] shadow-lg border border-gray-100 flex flex-col md:flex-row gap-8 items-center">
+                <div class="w-20 h-20 bg-orange-100 text-orange-600 rounded-3xl flex items-center justify-center text-3xl">
+                    <i class="fas fa-microchip"></i>
+                </div>
+                <div class="flex-1 text-center md:text-left">
+                    <div class="flex flex-col md:flex-row md:items-center gap-2 mb-2">
+                        <span class="text-[10px] font-black bg-orange-500 text-white px-3 py-1 rounded-full uppercase tracking-widest">${incident.incidentType}</span>
+                        <span class="text-sm font-bold text-gray-400">${new Date(incident.timestamp).toLocaleString()}</span>
+                    </div>
+                    <h3 class="text-2xl font-black text-gray-900">Incidente de ${member ? member.name : 'Miembro Desconocido'}</h3>
+                    <p class="text-gray-500 mt-2">Detección: <span class="font-bold text-gray-700">${incident.motionAnomaly}</span></p>
+                    <div class="mt-4 flex flex-wrap gap-4 justify-center md:justify-start">
+                        <div class="flex items-center gap-2 text-xs font-bold text-gray-600">
+                            <i class="fas fa-location-dot"></i>
+                            <span>${incident.latitude.toFixed(5)}, ${incident.longitude.toFixed(5)}</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-xs font-bold text-gray-600">
+                            <i class="fas fa-mountain"></i>
+                            <span>Presión: ${incident.altitudePressure.toFixed(2)} hPa</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="focusOnCoordinates(${incident.latitude}, ${incident.longitude})" class="bg-blue-600 text-white p-4 rounded-2xl hover:bg-blue-700 transition-all">
+                        <i class="fas fa-map-marked-alt"></i>
+                    </button>
+                    <button class="bg-gray-100 text-gray-400 p-4 rounded-2xl cursor-not-allowed">
+                        <i class="fas fa-play"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        container.innerHTML += card;
+    });
+}
+
+function focusOnCoordinates(lat, lng) {
+    switchTab('map');
+    if (map) {
+        map.setCenter({ lat: lat, lng: lng });
+        map.setZoom(18);
+    }
 }
 
 function renderSOSAlerts(sosMembers) {

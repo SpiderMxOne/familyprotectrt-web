@@ -160,5 +160,15 @@ const FirebaseManager = {
         return familyCollection.doc(code).onSnapshot(snapshot => {
             callback(snapshot.exists ? snapshot.data() : null);
         }, err => console.error("Error family group listener:", err));
+    },
+
+    listenForIncidents: (familyCode, callback) => {
+        const code = familyCode.trim().toUpperCase();
+        return familyCollection.doc(code).collection("incidents")
+            .orderBy("timestamp", "desc")
+            .onSnapshot(snapshot => {
+                const incidents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                callback(incidents);
+            }, err => console.error("Error incidents listener:", err));
     }
 };
