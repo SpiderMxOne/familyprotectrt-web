@@ -663,3 +663,28 @@ function copyFamilyCode() {
     navigator.clipboard.writeText(currentState.familyCode);
     showToast("Código copiado al portapapeles", "info");
 }
+
+// --- Emojis ---
+
+function toggleEmojiPicker(event) {
+    event.stopPropagation();
+    const picker = document.getElementById('emoji-picker');
+    picker.classList.toggle('hidden');
+}
+
+function insertEmoji(emoji) {
+    const input = document.getElementById('chat-input');
+    input.value += emoji;
+    input.focus();
+    document.getElementById('emoji-picker').classList.add('hidden');
+}
+
+// Close emoji picker when clicking outside
+document.addEventListener('click', (event) => {
+    const picker = document.getElementById('emoji-picker');
+    const emojiBtn = event.target.closest('button[onclick="toggleEmojiPicker(event)"]');
+
+    if (picker && !picker.contains(event.target) && !emojiBtn) {
+        picker.classList.add('hidden');
+    }
+});
