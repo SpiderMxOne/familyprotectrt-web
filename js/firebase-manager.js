@@ -141,7 +141,32 @@ const FirebaseManager = {
 
     addAuditLog: async (familyCode, log) => {
         const code = familyCode.trim().toUpperCase();
-        await familyCollection.doc(code).collection("audit_logs").add(log);
+        await familyCollection.doc(code).collection("audit_logs").add({
+            ...log,
+            timestamp: log.timestamp || Date.now()
+        });
+    },
+
+    approveMember: async (familyCode, memberId, role, memberType, kinship) => {
+        const code = familyCode.trim().toUpperCase();
+        await familyCollection.doc(code).collection("members").doc(memberId).update({
+            isApproved: true,
+            role: role,
+            memberType: memberType,
+            kinship: kinship
+        });
+    },
+
+    revokeApproval: async (familyCode, memberId) => {
+        const code = familyCode.trim().toUpperCase();
+        await familyCollection.doc(code).collection("members").doc(memberId).update({
+            isApproved: false
+        });
+    },
+
+    updateFamilyPremium: async (familyCode, isPremium) => {
+        const code = familyCode.trim().toUpperCase();
+        await familyCollection.doc(code).update({ isPremium: isPremium });
     },
 
     listenForAuditLogs: (familyCode, callback) => {

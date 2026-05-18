@@ -13,7 +13,8 @@ let currentState = {
     incidents: [],
     secretKey: null,
     selectedRecipientId: null,
-    activeTab: 'chat'
+    activeTab: 'chat',
+    language: 'es'
 };
 
 // Listeners Registrations
@@ -267,7 +268,17 @@ function startApp() {
 
 function checkWaitingApproval() {
     if (currentState.currentUser && !currentState.currentUser.isApproved && !currentState.currentUser.isAdmin) {
-        showToast("⚠️ Esperando aprobación del administrador...", "warning");
+        document.getElementById('dashboard').classList.add('hidden');
+        document.getElementById('onboarding').classList.remove('hidden');
+        document.getElementById('form-join').classList.add('hidden');
+        document.getElementById('form-admin').classList.add('hidden');
+        document.getElementById('form-waiting').classList.remove('hidden');
+        document.querySelector('.flex.mb-6.bg-gray-100').classList.add('hidden'); // Hide tabs
+    } else if (currentState.currentUser && (currentState.currentUser.isApproved || currentState.currentUser.isAdmin)) {
+        if (!document.getElementById('onboarding').classList.contains('hidden')) {
+            document.getElementById('onboarding').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+        }
     }
 }
 
@@ -289,6 +300,10 @@ function updateUIWithUser() {
     document.getElementById('user-name').innerText = currentState.currentUser.name;
     document.getElementById('user-role').innerText = currentState.currentUser.isAdmin ? "ADMINISTRADOR" : "MIEMBRO";
     document.querySelector('#user-badge div').innerText = currentState.currentUser.name.charAt(0).toUpperCase();
+
+    // --- ACTIVAR TEMA VISUAL ADAPTATIVO ---
+    const type = currentState.currentUser.memberType || 'ADULT';
+    document.body.setAttribute('data-theme', type);
 }
 
 function renderMembers() {
@@ -322,13 +337,24 @@ function renderMembers() {
 
 // Función auxiliar para no duplicar código en el re-render
 function renderMemberItems(member, chatList, familyGrid, mapList) {
+        const isAdmin = currentState.currentUser?.isAdmin;
+        const statusColor = member.isSOS ? 'text-red-500' :
+                          (member.isSafeMeetingActive ? 'text-orange-500' :
+                          (member.isSafetyTimerActive ? 'text-blue-500' :
+                          (member.isApproved ? 'text-green-500' : 'text-gray-400')));
+
+        const statusText = member.isSOS ? 'SOS' :
+                          (member.isSafeMeetingActive ? 'CITA' :
+                          (member.isSafetyTimerActive ? 'TIMER' :
+                          (member.isApproved ? 'OK' : 'WAIT')));
+
         // Chat List Item
         const chatItem = `
             <button onclick="selectRecipient('${member.id}')" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-all ${currentState.selectedRecipientId === member.id ? 'bg-blue-50 border border-blue-100' : ''}">
                 <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-600">${member.name.charAt(0)}</div>
                 <div class="text-left flex-1 overflow-hidden">
                     <p class="text-sm font-bold text-gray-800 truncate">${member.name}</p>
-                    <p class="text-[10px] text-gray-400 font-bold uppercase">${member.isApproved ? 'En Línea' : 'Pendiente'}</p>
+                    <p class="text-[10px] ${statusColor} font-black uppercase">${member.isApproved ? (member.isSOS ? 'Emergencia' : 'En Línea') : 'Esperando'}</p>
                 </div>
             </button>
         `;
@@ -336,30 +362,37 @@ function renderMemberItems(member, chatList, familyGrid, mapList) {
 
         // Family Grid Item
         const familyItem = `
-            <div class="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm hover:shadow-xl transition-all group">
-                <div class="flex items-center gap-4 mb-4">
+            <div class="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden">
+                ${member.isSOS ? '<div class="absolute inset-0 bg-red-600/5 animate-pulse pointer-events-none"></div>' : ''}
+                <div class="flex items-center gap-4 mb-4 relative z-10">
                     <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-xl font-black text-gray-400 group-hover:from-blue-500 group-hover:to-blue-600 group-hover:text-white transition-all">
                         ${member.name.charAt(0)}
                     </div>
                     <div class="flex-1">
                         <h4 class="font-bold text-gray-900">${member.name}</h4>
-                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-black tracking-widest uppercase">${member.role}</span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-black tracking-widest uppercase">${member.role}</span>
+                            ${!member.isApproved ? '<span class="text-[8px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 font-black uppercase">Pendiente</span>' : ''}
+                        </div>
                     </div>
-                    ${currentState.currentUser?.isAdmin ? `
-                        <button onclick="handleRevoke('${member.id}')" class="text-gray-300 hover:text-red-500 transition-colors">
-                            <i class="fas fa-user-minus"></i>
+                    ${isAdmin ? `
+                        <button onclick="openManageModal('${member.id}')" class="w-10 h-10 rounded-xl bg-gray-50 text-gray-300 hover:text-blue-600 hover:bg-blue-50 transition-all">
+                            <i class="fas fa-cog"></i>
                         </button>
                     ` : ''}
                 </div>
-                <div class="grid grid-cols-2 gap-2 mt-6">
+                <div class="grid grid-cols-2 gap-2 mt-6 relative z-10">
                     <div class="bg-gray-50 p-3 rounded-2xl text-center">
                         <p class="text-[9px] font-black text-gray-400 uppercase tracking-tighter">Batería</p>
-                        <p class="font-black text-gray-800">${member.batteryLevel || 0}%</p>
+                        <p class="font-black text-gray-800 flex items-center justify-center gap-1">
+                            ${member.isCharging ? '<i class="fas fa-bolt text-yellow-500 text-[10px]"></i>' : ''}
+                            ${member.batteryLevel || 0}%
+                        </p>
                     </div>
                     <div class="bg-gray-50 p-3 rounded-2xl text-center">
                         <p class="text-[9px] font-black text-gray-400 uppercase tracking-tighter">Estado</p>
-                        <p class="font-black ${member.isSOS ? 'text-red-500' : (member.isSafeMeetingActive ? 'text-orange-500' : 'text-green-500')}">
-                            ${member.isSOS ? 'SOS' : (member.isSafeMeetingActive ? 'CITA' : 'OK')}
+                        <p class="font-black ${statusColor} text-xs uppercase tracking-tighter">
+                            ${statusText}
                         </p>
                     </div>
                 </div>
@@ -370,14 +403,115 @@ function renderMemberItems(member, chatList, familyGrid, mapList) {
         // Map Status Item
         const mapItem = `
             <div class="flex items-center gap-4 cursor-pointer hover:bg-gray-50 p-1 rounded-lg" onclick="focusOnMember('${member.id}')">
-                <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-black">${member.name.charAt(0)}</div>
+                <div class="w-8 h-8 rounded-full ${member.isSOS ? 'bg-red-600' : 'bg-blue-600'} flex items-center justify-center text-white text-xs font-black">${member.name.charAt(0)}</div>
                 <div class="flex-1">
                     <p class="text-sm font-bold text-gray-800">${member.name}</p>
-                    <p class="text-[10px] text-gray-400 truncate">${member.currentActivity || 'Inactivo'}</p>
+                    <p class="text-[10px] text-gray-400 truncate">${member.currentActivity || 'En Línea'}</p>
                 </div>
             </div>
         `;
         mapList.innerHTML += mapItem;
+}
+
+// --- QR Code Logic ---
+
+let qrcode;
+
+function openQRModal() {
+    const modal = document.getElementById('qr-modal');
+    const qrContainer = document.getElementById('qrcode');
+    const codeText = document.getElementById('qr-code-text');
+
+    qrContainer.innerHTML = '';
+    codeText.innerText = currentState.familyCode;
+
+    qrcode = new QRCode(qrContainer, {
+        text: currentState.familyCode,
+        width: 200,
+        height: 200,
+        colorDark : "#000000",
+        colorLight : "#ffffff",
+        correctLevel : QRCode.CorrectLevel.H
+    });
+
+    modal.classList.remove('hidden');
+}
+
+function closeQRModal() {
+    document.getElementById('qr-modal').classList.add('hidden');
+}
+
+// --- Member Management Logic ---
+
+let memberToManage = null;
+
+function openManageModal(id) {
+    const member = currentState.members.find(m => m.id === id);
+    if (!member) return;
+
+    memberToManage = member;
+
+    document.getElementById('manage-name').innerText = member.name;
+    document.getElementById('manage-avatar').innerText = member.name.charAt(0).toUpperCase();
+    document.getElementById('manage-role').value = member.role === 'ADMIN' ? 'ADMIN' : 'MEMBER';
+    document.getElementById('manage-type').value = member.memberType || 'ADULT';
+    document.getElementById('manage-kinship').value = member.kinship || 'OTHER';
+
+    const saveBtn = document.getElementById('btn-save-member');
+    saveBtn.innerText = member.isApproved ? "ACTUALIZAR DATOS" : "AUTORIZAR ACCESO";
+    saveBtn.onclick = () => handleApproveMember(id);
+
+    const revokeBtn = document.getElementById('btn-revoke-member');
+    revokeBtn.innerText = member.isApproved ? "REVOCAR ACCESO" : "RECHAZAR SOLICITUD";
+    revokeBtn.onclick = () => handleRevokeMember(id);
+
+    document.getElementById('manage-modal').classList.remove('hidden');
+}
+
+function closeManageModal() {
+    document.getElementById('manage-modal').classList.add('hidden');
+    memberToManage = null;
+}
+
+async function handleApproveMember(id) {
+    const role = document.getElementById('manage-role').value;
+    const type = document.getElementById('manage-type').value;
+    const kinship = document.getElementById('manage-kinship').value;
+
+    showLoading(true);
+    await FirebaseManager.approveMember(currentState.familyCode, id, role, type, kinship);
+
+    await FirebaseManager.addAuditLog(currentState.familyCode, {
+        action: "ACCESO",
+        detail: `Miembro ${memberToManage.name} ${memberToManage.isApproved ? 'actualizado' : 'autorizado'}`,
+        timestamp: Date.now()
+    });
+
+    showToast("Miembro actualizado correctamente", "info");
+    closeManageModal();
+    showLoading(false);
+}
+
+async function handleRevokeMember(id) {
+    if (!confirm(`¿Estás seguro de que deseas ${memberToManage.isApproved ? 'revocar el acceso a' : 'rechazar la solicitud de'} ${memberToManage.name}?`)) return;
+
+    showLoading(true);
+    if (memberToManage.isApproved) {
+        await FirebaseManager.revokeApproval(currentState.familyCode, id);
+    } else {
+        // En caso de rechazo definitivo, podríamos eliminar el documento
+        await familyCollection.doc(currentState.familyCode).collection("members").doc(id).delete();
+    }
+
+    await FirebaseManager.addAuditLog(currentState.familyCode, {
+        action: "ACCESO",
+        detail: `Acceso revocado para: ${memberToManage.name}`,
+        timestamp: Date.now()
+    });
+
+    showToast("Acceso revocado", "warning");
+    closeManageModal();
+    showLoading(false);
 }
 
 function renderMembersOnMap() {
