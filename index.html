@@ -14,6 +14,8 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <!-- CryptoJS for E2EE -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <!-- QRCode.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/themes.css">
 </head>
@@ -72,6 +74,16 @@
                             CREAR FAMILIA
                         </button>
                     </div>
+                </div>
+
+                <!-- Waiting Approval (Hidden by default) -->
+                <div id="form-waiting" class="space-y-6 hidden text-center py-4">
+                    <div class="w-20 h-20 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+                        <i class="fas fa-clock text-3xl"></i>
+                    </div>
+                    <h3 class="text-xl font-black text-gray-900">Solicitud Enviada</h3>
+                    <p class="text-gray-500 text-sm">El administrador debe autorizar tu acceso para poder visualizar los datos de la familia.</p>
+                    <button onclick="handleLogout()" class="text-blue-600 font-bold text-sm hover:underline">Cancelar y Volver</button>
                 </div>
 
                 <div id="auth-status" class="mt-4 text-center text-sm font-medium text-red-500 hidden"></div>
@@ -257,6 +269,9 @@
                                 <button onclick="copyFamilyCode()" class="w-12 h-12 bg-white/20 rounded-2xl hover:bg-white/30 flex items-center justify-center transition-all">
                                     <i class="fas fa-copy"></i>
                                 </button>
+                                <button onclick="openQRModal()" class="w-12 h-12 bg-white/20 rounded-2xl hover:bg-white/30 flex items-center justify-center transition-all">
+                                    <i class="fas fa-qrcode"></i>
+                                </button>
                             </div>
                         </div>
                     </header>
@@ -369,6 +384,69 @@
 
         <!-- Global Toast Container -->
         <div id="toast-container" class="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] space-y-2"></div>
+
+        <!-- QR Modal -->
+        <div id="qr-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] hidden flex items-center justify-center p-4">
+            <div class="bg-white rounded-[40px] p-10 max-w-sm w-full text-center shadow-2xl animate-scale-up">
+                <h3 class="text-2xl font-black text-gray-900 mb-2">Acceso Rápido</h3>
+                <p class="text-gray-500 text-sm mb-8">Escanea este código desde la App móvil para unirte al grupo.</p>
+                <div id="qrcode" class="flex justify-center mb-8 p-4 bg-gray-50 rounded-3xl"></div>
+                <div class="bg-blue-50 p-4 rounded-2xl mb-8">
+                    <p class="text-[10px] font-black uppercase text-blue-400 tracking-widest mb-1">Código Manual</p>
+                    <p id="qr-code-text" class="text-2xl font-black tracking-[0.3em] text-blue-600 font-mono">------</p>
+                </div>
+                <button onclick="closeQRModal()" class="w-full bg-gray-900 text-white font-bold py-4 rounded-2xl hover:bg-black transition-all">CERRAR</button>
+            </div>
+        </div>
+
+        <!-- Member Management Modal -->
+        <div id="manage-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] hidden flex items-center justify-center p-4">
+            <div class="bg-white rounded-[40px] p-10 max-w-md w-full shadow-2xl animate-scale-up">
+                <div class="flex items-center gap-4 mb-8">
+                    <div id="manage-avatar" class="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-2xl font-black">?</div>
+                    <div>
+                        <h3 id="manage-name" class="text-2xl font-black text-gray-900 leading-tight">Nombre</h3>
+                        <p class="text-blue-500 font-bold text-xs uppercase tracking-widest">Configuración de Acceso</p>
+                    </div>
+                </div>
+
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Rol en el Sistema</label>
+                        <select id="manage-role" class="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 outline-none font-bold">
+                            <option value="MEMBER">Miembro Estándar</option>
+                            <option value="ADMIN">Administrador</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Tipo de Usuario</label>
+                            <select id="manage-type" class="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 outline-none font-bold">
+                                <option value="ADULT">Adulto</option>
+                                <option value="SENIOR">Adulto Mayor</option>
+                                <option value="YOUTH">Adolescente</option>
+                                <option value="CHILD">Niño/a</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Parentesco</label>
+                            <select id="manage-kinship" class="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 outline-none font-bold">
+                                <option value="PARENT">Padre/Madre</option>
+                                <option value="GRANDPARENT">Abuelo/a</option>
+                                <option value="CHILD">Hijo/a</option>
+                                <option value="OTHER">Otro</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-10 flex flex-col gap-3">
+                    <button id="btn-save-member" class="w-full bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all">AUTORIZAR ACCESO</button>
+                    <button id="btn-revoke-member" class="w-full bg-red-50 text-red-500 font-bold py-4 rounded-2xl hover:bg-red-100 transition-all">REVOCAR ACCESO</button>
+                    <button onclick="closeManageModal()" class="w-full text-gray-400 font-bold py-2 mt-2">CANCELAR</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Scripts -->
