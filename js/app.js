@@ -26,10 +26,9 @@ let listeners = {
     familyGroup: null
 };
 
-// Google Maps objects
+// MapLibre objects
 let map;
 let markers = {};
-let safePlaceCircles = [];
 
 // --- Initialization ---
 
@@ -37,48 +36,29 @@ document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     initOnboarding();
     checkExistingSession();
-    loadGoogleMapsScript(); // Carga dinámica de la API de Maps
+    initMapLibre();
 });
 
-function loadGoogleMapsScript() {
-    if (typeof window.FP_CONFIG === 'undefined' || !window.FP_CONFIG.googleMaps?.apiKey) {
-        console.warn("Maps API Key no configurada.");
-        return;
-    }
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${window.FP_CONFIG.googleMaps.apiKey}&callback=initMap`;
-    script.async = true;
-    script.defer = true;
-    document.head.appendChild(script);
-}
-
-// Función global requerida por Google Maps
-window.initMap = function() {
-    console.log("Google Maps API cargada.");
+function initMapLibre() {
     const mapContainer = document.getElementById('map');
     if (!mapContainer) return;
 
-    // Limpiar mensaje de placeholder
     mapContainer.innerHTML = '';
 
-    map = new google.maps.Map(mapContainer, {
-        center: { lat: 19.4326, lng: -99.1332 },
-        zoom: 12,
-        styles: [
-            { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
-            { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
-            { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
-            {
-              featureType: "administrative.locality",
-              elementType: "labels.text.fill",
-              stylers: [{ color: "#d59563" }],
-            }
-        ]
+    map = new maplibregl.Map({
+        container: 'map',
+        style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+        center: [-99.1332, 19.4326],
+        zoom: 12
     });
 
-    // Si ya hay datos cargados, renderizar
-    if (currentState.members.length > 0) renderMembersOnMap();
-};
+    map.addControl(new maplibregl.NavigationControl(), 'top-left');
+
+    map.on('load', () => {
+        console.log("MapLibre GL cargado correctamente en Web Dashboard.");
+        if (currentState.members.length > 0) renderMembersOnMap();
+    });
+}
 
 function initTabs() {
     const tabs = ['join', 'admin'];
@@ -114,7 +94,7 @@ async function checkExistingSession() {
             if (user && user.uid === savedUid) {
                 currentState.familyCode = savedCode;
                 currentState.uid = savedUid;
-                currentState.secretKey = SecurityUtils.deriveKey(savedCode);
+                currentState.secretKey = await SecurityUtils.deriveKey(savedCode);
                 startApp();
             } else {
                 localStorage.clear();
@@ -149,7 +129,7 @@ async function handleJoin() {
             saveSession(code, uid);
             currentState.familyCode = code;
             currentState.uid = uid;
-            currentState.secretKey = SecurityUtils.deriveKey(code);
+            currentState.secretKey = await SecurityUtils.deriveKey(code);
             startApp();
         } else {
             showAuthError("Código de familia no válido");
@@ -175,7 +155,7 @@ async function handleAdminLogin() {
             saveSession(code, uid);
             currentState.familyCode = code;
             currentState.uid = uid;
-            currentState.secretKey = SecurityUtils.deriveKey(code);
+            currentState.secretKey = await SecurityUtils.deriveKey(code);
             startApp();
         } else {
             showAuthError("No se encontró familia asociada");
@@ -211,7 +191,7 @@ async function handleAdminCreate() {
             saveSession(code, uid);
             currentState.familyCode = code;
             currentState.uid = uid;
-            currentState.secretKey = SecurityUtils.deriveKey(code);
+            currentState.secretKey = await SecurityUtils.deriveKey(code);
             startApp();
         } else {
             showAuthError("Error al crear la familia");
@@ -335,9 +315,12 @@ function renderMembers() {
     renderMembersOnMap(); // NUEVA LLAMADA
 }
 
-// Función auxiliar para no duplicar código en el re-render
 function renderMemberItems(member, chatList, familyGrid, mapList) {
         const isAdmin = currentState.currentUser?.isAdmin;
+        const score = member.safetyScore || 100;
+        const scoreColor = score > 80 ? 'text-green-500' : (score > 50 ? 'text-yellow-500' : 'text-red-500');
+        const scoreBg = score > 80 ? 'bg-green-500' : (score > 50 ? 'bg-yellow-500' : 'bg-red-500');
+
         const statusColor = member.isSOS ? 'text-red-500' :
                           (member.isSafeMeetingActive ? 'text-orange-500' :
                           (member.isSafetyTimerActive ? 'text-blue-500' :
@@ -351,11 +334,15 @@ function renderMemberItems(member, chatList, familyGrid, mapList) {
         // Chat List Item
         const chatItem = `
             <button onclick="selectRecipient('${member.id}')" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-all ${currentState.selectedRecipientId === member.id ? 'bg-blue-50 border border-blue-100' : ''}">
-                <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-600">${member.name.charAt(0)}</div>
+                <div class="relative">
+                    <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-600">${member.name.charAt(0)}</div>
+                    <div class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${scoreBg}"></div>
+                </div>
                 <div class="text-left flex-1 overflow-hidden">
                     <p class="text-sm font-bold text-gray-800 truncate">${member.name}</p>
                     <p class="text-[10px] ${statusColor} font-black uppercase">${member.isApproved ? (member.isSOS ? 'Emergencia' : 'En Línea') : 'Esperando'}</p>
                 </div>
+                <div class="text-[10px] font-black ${scoreColor}">${score}%</div>
             </button>
         `;
         chatList.innerHTML += chatItem;
@@ -365,8 +352,13 @@ function renderMemberItems(member, chatList, familyGrid, mapList) {
             <div class="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden">
                 ${member.isSOS ? '<div class="absolute inset-0 bg-red-600/5 animate-pulse pointer-events-none"></div>' : ''}
                 <div class="flex items-center gap-4 mb-4 relative z-10">
-                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-xl font-black text-gray-400 group-hover:from-blue-500 group-hover:to-blue-600 group-hover:text-white transition-all">
-                        ${member.name.charAt(0)}
+                    <div class="relative">
+                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-xl font-black text-gray-400 group-hover:from-blue-500 group-hover:to-blue-600 group-hover:text-white transition-all">
+                            ${member.name.charAt(0)}
+                        </div>
+                        <div class="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center border border-gray-50">
+                             <div class="text-[10px] font-black ${scoreColor}">${score}</div>
+                        </div>
                     </div>
                     <div class="flex-1">
                         <h4 class="font-bold text-gray-900">${member.name}</h4>
@@ -381,7 +373,13 @@ function renderMemberItems(member, chatList, familyGrid, mapList) {
                         </button>
                     ` : ''}
                 </div>
-                <div class="grid grid-cols-2 gap-2 mt-6 relative z-10">
+
+                <!-- Safety Score Bar -->
+                <div class="w-full bg-gray-100 h-1.5 rounded-full mb-6 overflow-hidden">
+                    <div class="${scoreBg} h-full transition-all duration-1000" style="width: ${score}%"></div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 mt-2 relative z-10">
                     <div class="bg-gray-50 p-3 rounded-2xl text-center">
                         <p class="text-[9px] font-black text-gray-400 uppercase tracking-tighter">Batería</p>
                         <p class="font-black text-gray-800 flex items-center justify-center gap-1">
@@ -514,43 +512,67 @@ async function handleRevokeMember(id) {
     showLoading(false);
 }
 
-function renderMembersOnMap() {
+async function renderMembersOnMap() {
     if (!map) return;
 
-    currentState.members.forEach(member => {
-        if (member.latitude && member.longitude) {
-            const position = { lat: member.latitude, lng: member.longitude };
+    for (const member of currentState.members) {
+        let lat = member.latitude;
+        let lng = member.longitude;
+        let bearing = 0;
 
-            if (markers[member.id]) {
-                markers[member.id].setPosition(position);
-            } else {
-                markers[member.id] = new google.maps.Marker({
-                    position: position,
-                    map: map,
-                    title: member.name,
-                    icon: {
-                        path: google.maps.SymbolPath.CIRCLE,
-                        scale: 10,
-                        fillColor: member.isSOS ? "#FF0000" : "#2563eb",
-                        fillOpacity: 1,
-                        strokeWeight: 2,
-                        strokeColor: "#FFFFFF"
-                    }
-                });
+        if (member.lastEncryptedLocation && currentState.secretKey) {
+            try {
+                const decrypted = await SecurityUtils.decrypt(member.lastEncryptedLocation, currentState.secretKey);
+                const data = JSON.parse(decrypted);
+                lat = data.lat;
+                lng = data.lng;
+                bearing = data.bea || 0;
+            } catch (e) {
+                console.warn("Error descifrando ubicación para", member.name);
             }
         }
-    });
+
+        if (lat && lng) {
+            const lngLat = [lng, lat];
+
+            if (markers[member.id]) {
+                markers[member.id].setLngLat(lngLat);
+            } else {
+                const el = document.createElement('div');
+                el.className = 'custom-marker';
+                el.style.width = '32px';
+                el.style.height = '32px';
+                el.style.backgroundColor = member.isSOS ? '#EF4444' : '#2563EB';
+                el.style.borderRadius = '50%';
+                el.style.border = '3px solid #FFFFFF';
+                el.style.boxShadow = '0 4px 6px rgba(0,0,0,0.3)';
+                el.style.display = 'flex';
+                el.style.alignItems = 'center';
+                el.style.justifyContent = 'center';
+                el.style.color = '#FFFFFF';
+                el.style.fontWeight = 'bold';
+                el.style.fontSize = '12px';
+                el.innerText = member.name ? member.name.charAt(0).toUpperCase() : 'U';
+
+                const marker = new maplibregl.Marker(el)
+                    .setLngLat(lngLat)
+                    .setPopup(new maplibregl.Popup({ offset: 25 }).setHTML(`<strong>${member.name}</strong><br>${member.currentActivity || 'En línea'}`))
+                    .addTo(map);
+
+                markers[member.id] = marker;
+            }
+        }
+    }
 }
 
 function focusOnMember(id) {
     const member = currentState.members.find(m => m.id === id);
     if (member && member.latitude && member.longitude && map) {
-        map.setCenter({ lat: member.latitude, lng: member.longitude });
-        map.setZoom(16);
+        map.flyTo({ center: [member.longitude, member.latitude], zoom: 16 });
     }
 }
 
-function renderMessages() {
+async function renderMessages() {
     const container = document.getElementById('chat-messages');
     container.innerHTML = '';
 
@@ -560,9 +582,9 @@ function renderMessages() {
                (msg.senderId === currentState.selectedRecipientId && msg.recipientId === currentState.uid);
     }).reverse();
 
-    filtered.forEach(msg => {
+    for (const msg of filtered) {
         const isMe = msg.senderId === currentState.uid;
-        const decrypted = SecurityUtils.decrypt(msg.encryptedContent, currentState.secretKey);
+        const decrypted = await SecurityUtils.decrypt(msg.encryptedContent, currentState.secretKey);
 
         const bubble = `
             <div class="flex ${isMe ? 'justify-end' : 'justify-start'} animate-slide-up">
@@ -574,7 +596,7 @@ function renderMessages() {
             </div>
         `;
         container.innerHTML += bubble;
-    });
+    }
     container.scrollTop = container.scrollHeight;
 }
 
@@ -583,11 +605,12 @@ function renderAuditLogs() {
     if (!container) return;
     container.innerHTML = '';
     currentState.auditLogs.forEach(log => {
+        const isIA = log.action === 'IA_SENTINEL';
         const line = `
-            <div class="border-l border-blue-500/30 pl-3 py-1">
-                <span class="text-blue-500">[${new Date(log.timestamp).toLocaleTimeString()}]</span>
+            <div class="border-l ${isIA ? 'border-red-500' : 'border-blue-500/30'} pl-3 py-1 mb-1">
+                <span class="${isIA ? 'text-red-500' : 'text-blue-500'}">[${new Date(log.timestamp).toLocaleTimeString()}]</span>
                 <span class="text-white font-bold">${log.action}:</span>
-                <span class="text-gray-400">${log.detail}</span>
+                <span class="${isIA ? 'text-red-400 font-black italic' : 'text-gray-400'}">${log.detail}</span>
             </div>
         `;
         container.innerHTML += line;
@@ -651,8 +674,7 @@ function renderIncidents() {
 function focusOnCoordinates(lat, lng) {
     switchTab('map');
     if (map) {
-        map.setCenter({ lat: lat, lng: lng });
-        map.setZoom(18);
+        map.flyTo({ center: [lng, lat], zoom: 18 });
     }
 }
 
@@ -669,13 +691,22 @@ function renderSOSAlerts(sosMembers) {
 
     container.innerHTML = '';
     sosMembers.forEach(member => {
+        const score = member.safetyScore || 100;
+        const scoreColor = score > 50 ? 'text-yellow-500' : 'text-red-500';
+
         const card = `
             <div class="sos-card p-10 rounded-[50px] shadow-2xl relative overflow-hidden group">
                 <div class="absolute top-0 right-0 p-8">
                     <div class="animate-ping w-4 h-4 bg-red-500 rounded-full"></div>
                 </div>
                 <div class="relative z-10 text-left">
-                    <p class="text-red-500 font-black text-xs uppercase tracking-widest mb-2">Emergencia en curso</p>
+                    <div class="flex justify-between items-start mb-2">
+                        <p class="text-red-500 font-black text-xs uppercase tracking-widest">Emergencia en curso</p>
+                        <div class="text-right">
+                            <p class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Safety Score</p>
+                            <p class="text-2xl font-black ${scoreColor}">${score}%</p>
+                        </div>
+                    </div>
                     <h2 class="text-4xl font-black text-white mb-6 uppercase tracking-tighter">${member.name}</h2>
                     <div class="space-y-4 mb-8">
                         <div class="flex items-center gap-3 text-gray-400">
@@ -683,13 +714,15 @@ function renderSOSAlerts(sosMembers) {
                             <span class="font-bold">${member.batteryLevel}% de Batería</span>
                         </div>
                         <div class="flex items-center gap-3 text-gray-400">
-                            <i class="fas fa-clock"></i>
-                            <span class="font-bold">Hace ${Math.floor((Date.now() - member.lastSeen) / 60000)} minutos</span>
+                            <i class="fas fa-location-arrow"></i>
+                            <span class="font-bold">Actividad: ${member.currentActivity || 'SOS Activo'}</span>
                         </div>
                     </div>
                     <div class="flex gap-4">
-                        <button onclick="switchTab('map')" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-black py-4 rounded-2xl transition-all">LOCALIZAR</button>
-                        ${currentState.currentUser?.isAdmin ? `<button onclick="handleStopSOS('${member.id}')" class="px-6 bg-white/10 hover:bg-white/20 text-white rounded-2xl transition-all"><i class="fas fa-check"></i></button>` : ''}
+                        <button onclick="focusOnMember('${member.id}'); switchTab('map')" class="flex-1 bg-white text-black font-black py-4 rounded-2xl hover:bg-gray-100 transition-all">UBICAR EN MAPA</button>
+                        ${currentState.currentUser?.isAdmin ? `
+                            <button onclick="handleStopSOS('${member.id}')" class="px-6 bg-red-600/20 text-red-500 border border-red-600/30 rounded-2xl hover:bg-red-600 hover:text-white transition-all"><i class="fas fa-check"></i></button>
+                        ` : ''}
                     </div>
                 </div>
             </div>
@@ -716,7 +749,7 @@ async function handleSendMessage() {
     const text = input.value.trim();
     if (!text || !currentState.secretKey) return;
 
-    const encrypted = SecurityUtils.encrypt(text, currentState.secretKey);
+    const encrypted = await SecurityUtils.encrypt(text, currentState.secretKey);
     const message = {
         id: Math.random().toString(36).substring(7),
         senderId: currentState.uid,

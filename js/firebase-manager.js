@@ -115,7 +115,11 @@ const FirebaseManager = {
 
     sendMessage: async (familyCode, message) => {
         const code = familyCode.trim().toUpperCase();
-        await familyCollection.doc(code).collection("messages").doc(message.id).set(message);
+        const fifteenDays = 15 * 24 * 60 * 60 * 1000;
+        await familyCollection.doc(code).collection("messages").doc(message.id).set({
+            ...message,
+            expireAt: Date.now() + fifteenDays
+        });
     },
 
     updateSOSStatus: async (familyCode, memberId, active) => {
