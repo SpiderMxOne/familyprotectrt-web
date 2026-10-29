@@ -12,8 +12,6 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <!-- CryptoJS for E2EE -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <!-- QRCode.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link rel="stylesheet" href="css/styles.css">
@@ -236,9 +234,8 @@
                         <div id="map" class="absolute inset-0 bg-gray-200">
                             <div class="h-full flex items-center justify-center flex-col p-12 text-center bg-gray-900 text-white">
                                 <i class="fas fa-map-marked-alt text-6xl mb-6 text-blue-500 opacity-20"></i>
-                                <h3 class="text-2xl font-black mb-2">Configuración de Google Maps</h3>
-                                <p class="text-gray-400 max-w-sm">Para activar el mapa real, debes añadir tu API KEY de Google Cloud en el archivo app.js</p>
-                                <button class="mt-8 bg-blue-600 px-8 py-3 rounded-xl font-bold">Vincular Servicio</button>
+                                <h3 class="text-2xl font-black mb-2">Mapa Vectorial MapLibre (OSM)</h3>
+                                <p class="text-gray-400 max-w-sm">Cargando mapa vectorial de alta velocidad con OpenStreetMap...</p>
                             </div>
                         </div>
                         <!-- Map Overlay (Members Card) -->
@@ -449,13 +446,15 @@
         </div>
     </div>
 
+    <!-- MapLibre GL JS -->
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+
     <!-- Scripts -->
     <script src="js/config.js"></script>
     <script src="js/firebase-init.js"></script>
     <script src="js/security-utils.js"></script>
     <script src="js/firebase-manager.js"></script>
     <script src="js/app.js"></script>
-
-    <!-- Google Maps JS API (Cargado dinámicamente desde app.js para usar la llave de config.js) -->
 </body>
 </html>
